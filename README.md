@@ -14,8 +14,8 @@ This repository contains a Laravel application configured for deployment on Kube
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/anisAronno/laravel-kubernetes.git
-cd laravel-kubernetes
+git clone https://github.com/anisAronno/kubernetes-practice-projects.git
+cd kubernetes-practice-projects
 ```
 
 ### 2. Start Minikube
