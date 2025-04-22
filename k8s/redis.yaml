@@ -1,30 +1,48 @@
+# redis.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: redis
+  namespace: laravel-app
 spec:
-  replicas: 1
   selector:
     matchLabels:
       app: redis
+  replicas: 1
   template:
     metadata:
       labels:
         app: redis
     spec:
       containers:
-        - name: redis
-          image: redis:7
-          ports:
-            - containerPort: 6379
+      - name: redis
+        image: redis:alpine
+        ports:
+        - containerPort: 6379
+        volumeMounts:
+        - name: redis-persistent-storage
+          mountPath: /data
+        resources:
+          limits:
+            memory: 256Mi
+            cpu: "0.2"
+          requests:
+            memory: 128Mi
+            cpu: "0.1"
+      volumes:
+      - name: redis-persistent-storage
+        persistentVolumeClaim:
+          claimName: redis-pvc
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: redis
+  name: redis-service
+  namespace: laravel-app
 spec:
+  ports:
+  - port: 6379
+    targetPort: 6379
   selector:
     app: redis
-  ports:
-    - protocol: TCP
-      port: 6379
+  clusterIP: None  # This creates a headless service for fixed IP

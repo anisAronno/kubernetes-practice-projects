@@ -1,0 +1,133 @@
+# laravel.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: laravel-app
+  namespace: laravel-app
+spec:
+  replicas: 3  # 3 replicas as requested
+  selector:
+    matchLabels:
+      app: laravel-app
+      tier: production
+  template:
+    metadata:
+      labels:
+        app: laravel-app
+        tier: production
+    spec:
+      containers:
+      - name: laravel-app
+        image: php:8.3-fpm
+        ports:
+        - containerPort: 9000
+        envFrom:
+        - secretRef:
+            name: laravel-env
+        volumeMounts:
+        - name: app-code
+          mountPath: /var/www/html
+        resources:
+          limits:
+            memory: 512Mi
+            cpu: "0.5"
+          requests:
+            memory: 256Mi
+            cpu: "0.2"
+        lifecycle:
+          postStart:
+            exec:
+              command: ["/bin/sh", "-c", "apt-get update && apt-get install -y libzip-dev zip unzip && docker-php-ext-install pdo pdo_mysql zip && pecl install redis && docker-php-ext-enable redis"]
+      initContainers:
+      - name: install-laravel
+        image: composer:latest
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            cd /var/www/html
+            if [ ! -f "composer.json" ]; then
+              composer create-project --prefer-dist laravel/laravel .
+            fi
+            composer install --no-dev
+            php artisan key:generate
+            php artisan optimize
+            chown -R www-data:www-data /var/www/html
+        volumeMounts:
+        - name: app-code
+          mountPath: /var/www/html
+      volumes:
+      - name: app-code
+        emptyDir: {}
+---
+# staging deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: laravel-app-staging
+  namespace: laravel-app
+spec:
+  replicas: 1  # 1 staging as requested
+  selector:
+    matchLabels:
+      app: laravel-app
+      tier: staging
+  template:
+    metadata:
+      labels:
+        app: laravel-app
+        tier: staging
+    spec:
+      containers:
+      - name: laravel-app
+        image: php:8.3-fpm
+        ports:
+        - containerPort: 9000
+        envFrom:
+        - secretRef:
+            name: laravel-env
+        volumeMounts:
+        - name: app-code
+          mountPath: /var/www/html
+        resources:
+          limits:
+            memory: 512Mi
+            cpu: "0.5"
+          requests:
+            memory: 256Mi
+            cpu: "0.2"
+        lifecycle:
+          postStart:
+            exec:
+              command: ["/bin/sh", "-c", "apt-get update && apt-get install -y libzip-dev zip unzip && docker-php-ext-install pdo pdo_mysql zip && pecl install redis && docker-php-ext-enable redis"]
+      initContainers:
+      - name: install-laravel
+        image: composer:latest
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            cd /var/www/html
+            if [ ! -f "composer.json" ]; then
+              composer create-project --prefer-dist laravel/laravel .
+            fi
+            composer install
+            php artisan key:generate
+            php artisan optimize
+            chown -R www-data:www-data /var/www/html
+        volumeMounts:
+        - name: app-code
+          mountPath: /var/www/html
+      volumes:
+      - name: app-code
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: laravel-service
+  namespace: laravel-app
+spec:
+  selector:
+    app: laravel-app
+  ports:
+  - port: 9000
+    targetPort: 9000

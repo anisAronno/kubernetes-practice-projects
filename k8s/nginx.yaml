@@ -1,29 +1,11 @@
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: nginx-config
-data:
-  default.conf: |
-    # Your custom Nginx configuration goes here
-    server {
-        listen 80;
-        server_name localhost;
-        location / {
-            proxy_pass http://laravel-app:9001;
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto $scheme;
-        }
-    }
-
----
+# nginx.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: nginx
+  namespace: laravel-app
 spec:
-  replicas: 1
+  replicas: 3
   selector:
     matchLabels:
       app: nginx
@@ -34,12 +16,38 @@ spec:
     spec:
       containers:
       - name: nginx
-        image: nginx:latest
+        image: nginx:alpine
+        ports:
+        - containerPort: 80
         volumeMounts:
+        - name: app-code
+          mountPath: /var/www/html
         - name: nginx-config
           mountPath: /etc/nginx/conf.d/default.conf
-          subPath: default.conf
+          subPath: nginx.conf
+        resources:
+          limits:
+            memory: 256Mi
+            cpu: "0.2"
+          requests:
+            memory: 128Mi
+            cpu: "0.1"
       volumes:
-        - name: nginx-config
-          configMap:
-            name: nginx-config
+      - name: app-code
+        emptyDir: {}
+      - name: nginx-config
+        configMap:
+          name: nginx-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-service
+  namespace: laravel-app
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 8080  # Using port 8080 to avoid conflicts with your existing services
+    targetPort: 80
+  selector:
+    app: nginx

@@ -1,61 +1,307 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Laravel Kubernetes Deployment
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+This repository contains a Laravel application configured for deployment on Kubernetes. The setup includes MySQL, Redis, Nginx with a load balancer, and PHPMyAdmin.
 
-## About Laravel
+## Prerequisites
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+- Docker installed and running
+- Minikube installed
+- kubectl CLI installed
+- Basic knowledge of Kubernetes concepts
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Getting Started
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+### 1. Clone the Repository
 
-## Learning Laravel
+```bash
+git clone https://github.com/anisAronno/laravel-kubernetes.git
+cd laravel-kubernetes
+```
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+### 2. Start Minikube
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+```bash
+minikube start
+```
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+Verify Minikube is running:
+```bash
+minikube status
+```
 
-## Laravel Sponsors
+### 3. Deploy the Application
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+The configuration files are organized in the `k8s` directory. Deploy them step by step:
 
-### Premium Partners
+#### Create Namespace
 
-- **[Vehikl](https://vehikl.com/)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel/)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development/)**
-- **[Active Logic](https://activelogic.com)**
+```bash
+kubectl apply -f k8s/namespace.yaml
+```
 
-## Contributing
+Verify the namespace was created:
+```bash
+kubectl get namespaces
+# You should see 'laravel-app' in the list
+```
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+#### Create Secrets
 
-## Code of Conduct
+```bash
+kubectl apply -f k8s/mysql-secret.yaml
+kubectl apply -f k8s/laravel-env-secret.yaml
+kubectl apply -f k8s/redis-secret.yaml
+```
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+Verify secrets were created:
+```bash
+kubectl get secrets -n laravel-app
+# You should see all three secrets listed
+```
 
-## Security Vulnerabilities
+#### Create Storage Resources
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+```bash
+kubectl apply -f k8s/storage.yaml
+```
+
+Verify persistent volume claims were created:
+```bash
+kubectl get pvc -n laravel-app
+# You should see 'mysql-pvc' and 'redis-pvc'
+```
+
+#### Deploy Database & Redis
+
+```bash
+kubectl apply -f k8s/mysql.yaml
+kubectl apply -f k8s/redis.yaml
+```
+
+Verify MySQL and Redis pods are running:
+```bash
+kubectl get pods -n laravel-app -l app=mysql
+kubectl get pods -n laravel-app -l app=redis
+# Wait until status shows 'Running' for both
+```
+
+#### Create Nginx ConfigMap
+
+```bash
+kubectl apply -f k8s/nginx-configmap.yaml
+```
+
+Verify configmap was created:
+```bash
+kubectl get configmaps -n laravel-app
+# You should see 'nginx-config' in the list
+```
+
+#### Deploy Laravel Application
+
+```bash
+kubectl apply -f k8s/laravel.yaml
+```
+
+Verify Laravel pods are running:
+```bash
+kubectl get pods -n laravel-app -l app=laravel-app
+# You should see multiple pods with 'Running' status
+```
+
+#### Deploy Nginx
+
+```bash
+kubectl apply -f k8s/nginx.yaml
+```
+
+Verify Nginx pods are running:
+```bash
+kubectl get pods -n laravel-app -l app=nginx
+# You should see multiple pods with 'Running' status
+```
+
+#### Deploy PHPMyAdmin
+
+```bash
+kubectl apply -f k8s/phpmyadmin.yaml
+```
+
+Verify PHPMyAdmin pod is running:
+```bash
+kubectl get pods -n laravel-app -l app=phpmyadmin
+# Wait until status shows 'Running'
+```
+
+Verify all services are created:
+```bash
+kubectl get services -n laravel-app
+# You should see all your services listed
+```
+
+### 4. Set Up SSL for Local Development
+
+```bash
+# Install cert-manager
+kubectl apply -f https://github.com/jetstack/cert-manager/releases/download/v1.8.0/cert-manager.yaml
+```
+
+Verify cert-manager is installed:
+```bash
+kubectl get pods -n cert-manager
+# Wait until all pods show 'Running' status
+```
+
+Wait for cert-manager to be ready:
+```bash
+kubectl wait --for=condition=Ready pods -n cert-manager --all --timeout=300s
+```
+
+Create the self-signed certificate issuer:
+```bash
+kubectl apply -f k8s/self-signed-issuer.yaml
+```
+
+Verify certificate issuer was created:
+```bash
+kubectl get clusterissuer
+# You should see 'selfsigned-issuer' in the list
+```
+
+Create the ingress with SSL:
+```bash
+kubectl apply -f k8s/ingress.yaml
+```
+
+Verify ingress was created:
+```bash
+kubectl get ingress -n laravel-app
+# You should see your ingress configuration
+```
+
+Enable ingress in minikube:
+```bash
+minikube addons enable ingress
+```
+
+### 5. Configure Local Hosts
+
+Get your Minikube IP:
+```bash
+minikube ip
+```
+
+Add entries to your hosts file:
+```bash
+sudo bash -c "echo '$(minikube ip) laravel.local phpmyadmin.local' >> /etc/hosts"
+```
+
+Verify hosts file was updated:
+```bash
+cat /etc/hosts | grep laravel.local
+# Should show the minikube IP with both domains
+```
+
+## Accessing the Application
+
+- Laravel Application: https://laravel.local
+- PHPMyAdmin: https://phpmyadmin.local
+
+Check if applications are accessible:
+```bash
+# For HTTP status code
+curl -k -I https://laravel.local
+curl -k -I https://phpmyadmin.local
+# Should return HTTP 200 OK
+```
+
+## Verifying Deployments
+
+Check if all components are running correctly:
+
+```bash
+kubectl get pods -n laravel-app
+# All pods should show 'Running' status
+
+kubectl get services -n laravel-app
+# All services should be listed
+
+kubectl get deployments -n laravel-app
+# All deployments should show desired replicas as available
+```
+
+## Troubleshooting
+
+### View Logs
+
+```bash
+# Get pod names
+kubectl get pods -n laravel-app
+
+# View logs for a specific pod
+kubectl logs -n laravel-app [pod-name]
+```
+
+### Check Pod Details
+
+```bash
+# Get detailed information about a pod
+kubectl describe pod -n laravel-app [pod-name]
+```
+
+### Check Service Details
+
+```bash
+# Get detailed information about a service
+kubectl describe service -n laravel-app [service-name]
+```
+
+### Alternative Access via Port Forwarding
+
+If the Ingress setup isn't working, you can use port forwarding:
+
+```bash
+# For Laravel application
+kubectl port-forward -n laravel-app svc/nginx-service 8080:8080
+
+# For PHPMyAdmin
+kubectl port-forward -n laravel-app svc/phpmyadmin-service 8081:8081
+```
+
+Then access via:
+- Laravel: http://localhost:8080
+- PHPMyAdmin: http://localhost:8081
+
+## Production Deployment Notes
+
+For production deployment:
+
+1. Update domain names in the ingress configuration
+2. Set up a proper SSL certificate issuer using Let's Encrypt
+3. Update Laravel environment variables with production values
+
+## Clean Up
+
+To remove all resources:
+
+```bash
+kubectl delete namespace laravel-app
+```
+
+Verify the namespace was deleted:
+```bash
+kubectl get namespaces
+# 'laravel-app' should no longer be in the list
+```
+
+## Configuration Details
+
+- **Laravel**: PHP 8.3 with Redis extension, 3 replicas for production, 1 for staging
+- **MySQL**: Persistent storage, credentials stored in secrets
+- **Redis**: Persistent storage for data
+- **Nginx**: Configured as a load balancer with 3 replicas
+- **PHPMyAdmin**: Web interface for database management
 
 ## License
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+[MIT](LICENSE)

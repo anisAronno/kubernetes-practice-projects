@@ -1,56 +1,71 @@
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: mysql-pv-claim
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 1Gi
----
+# mysql.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: mysql
+  namespace: laravel-app
 spec:
   selector:
     matchLabels:
       app: mysql
+  strategy:
+    type: Recreate
   template:
     metadata:
       labels:
         app: mysql
     spec:
       containers:
-        - name: mysql
-          image: mysql:8
-          env:
-            - name: MYSQL_ROOT_PASSWORD
-              value: rootpass
-            - name: MYSQL_DATABASE
-              value: laravel
-            - name: MYSQL_USER
-              value: laravel
-            - name: MYSQL_PASSWORD
-              value: laravelpass
-          ports:
-            - containerPort: 3306
-          volumeMounts:
-            - mountPath: /var/lib/mysql
-              name: mysql-persistent-storage
-      volumes:
+      - image: mysql:8.0
+        name: mysql
+        env:
+        - name: MYSQL_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: mysql-secret
+              key: MYSQL_ROOT_PASSWORD
+        - name: MYSQL_DATABASE
+          valueFrom:
+            secretKeyRef:
+              name: mysql-secret
+              key: MYSQL_DATABASE
+        - name: MYSQL_USER
+          valueFrom:
+            secretKeyRef:
+              name: mysql-secret
+              key: MYSQL_USER
+        - name: MYSQL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: mysql-secret
+              key: MYSQL_PASSWORD
+        ports:
+        - containerPort: 3306
+          name: mysql
+        volumeMounts:
         - name: mysql-persistent-storage
-          persistentVolumeClaim:
-            claimName: mysql-pv-claim
+          mountPath: /var/lib/mysql
+        resources:
+          limits:
+            memory: 512Mi
+            cpu: "0.5"
+          requests:
+            memory: 256Mi
+            cpu: "0.2"
+      volumes:
+      - name: mysql-persistent-storage
+        persistentVolumeClaim:
+          claimName: mysql-pvc
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: mysql
+  name: mysql-service
+  namespace: laravel-app
 spec:
+  ports:
+  - port: 3306
+    targetPort: 3306
   selector:
     app: mysql
-  ports:
-    - protocol: TCP
-      port: 3306
+  clusterIP: None  # This creates a headless service for fixed IP
